@@ -1,7 +1,8 @@
+# 增加高级搜索功能
+
 import streamlit as st
 import pandas as pd
 import os
-import re
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
 st.title("📚 精华消息检索系统")
@@ -19,12 +20,30 @@ def load_data():
 df = load_data()
 
 # ---------- 侧边栏筛选 ----------
-st.sidebar.header("🔍 搜索条件")
-search_term = st.sidebar.text_input("关键词（搜索头衔、名字、内容等）")
-setjingren_list = ['全部'] + sorted(df['设精人'].unique().tolist())
-selected_setjingren = st.sidebar.selectbox("设精人", setjingren_list)
-format_list = ['全部'] + sorted(df['格式'].unique().tolist())
-selected_format = st.sidebar.selectbox("格式", format_list)
+st.sidebar.header("🔍 检索条件")
+
+# 检索模式选择
+search_mode = st.sidebar.radio("选择检索模式", ["普通检索", "高级检索"])
+
+# 根据模式显示不同的搜索框
+if search_mode == "普通检索":
+    search_term = st.sidebar.text_input("关键词（在头衔、名字、内容、设精人中搜索）")
+    # 将高级检索的关键词置空
+    kw_title = kw_name = kw_content = kw_setjingren = None
+else:
+    st.sidebar.markdown("高级检索（留空表示不限制）")
+    kw_title = st.sidebar.text_input("头衔关键词")
+    kw_name = st.sidebar.text_input("名字关键词")
+    kw_content = st.sidebar.text_input("内容关键词")
+    kw_setjingren = st.sidebar.text_input("设精人关键词")
+    search_term = None  # 普通检索的关键词无效
+
+
+# ---------- 格式多选（关键改动）----------
+format_options = sorted(df['格式'].unique().tolist())
+selected_formats = st.sidebar.multiselect("格式", format_options, default=None)
+
+# 日期范围
 st.sidebar.subheader("📅 日期范围")
 min_date = df['日期'].min().date()
 max_date = df['日期'].max().date()
@@ -33,16 +52,30 @@ end_date = st.sidebar.date_input("结束日期", max_date)
 
 # ---------- 应用筛选 ----------
 filtered_df = df.copy()
-if search_term:
+
+# 关键词筛选（根据模式）
+if search_mode == "普通检索" and search_term:
     text_cols = ['头衔', '名字', '内容', '设精人']
     mask = filtered_df[text_cols].apply(
         lambda row: row.astype(str).str.contains(search_term, case=False, na=False).any(), axis=1
     )
     filtered_df = filtered_df[mask]
-if selected_setjingren != '全部':
-    filtered_df = filtered_df[filtered_df['设精人'] == selected_setjingren]
-if selected_format != '全部':
-    filtered_df = filtered_df[filtered_df['格式'] == selected_format]
+elif search_mode == "高级检索":
+    if kw_title:
+        filtered_df = filtered_df[filtered_df['头衔'].astype(str).str.contains(kw_title, case=False, na=False)]
+    if kw_name:
+        filtered_df = filtered_df[filtered_df['名字'].astype(str).str.contains(kw_name, case=False, na=False)]
+    if kw_content:
+        filtered_df = filtered_df[filtered_df['内容'].astype(str).str.contains(kw_content, case=False, na=False)]
+    if kw_setjingren:
+        filtered_df = filtered_df[filtered_df['设精人'].astype(str).str.contains(kw_setjingren, case=False, na=False)]
+
+
+# 格式多选筛选（关键改动）
+if selected_formats:  # 如果用户选择了至少一个格式
+    filtered_df = filtered_df[filtered_df['格式'].isin(selected_formats)]
+
+# 日期筛选
 filtered_df = filtered_df[
     (filtered_df['日期'].dt.date >= start_date) & 
     (filtered_df['日期'].dt.date <= end_date)
@@ -88,16 +121,7 @@ else:
         else:
             st.markdown(row['内容'])
 
-
-        # 消息之间的分隔线：极细，上下边距很小
-        # st.markdown("<hr style='margin:2px 0; opacity:0.3;'>", unsafe_allow_html=True)
-        
-        # 消息之间的分隔线：上下边距加大，略宽于内部行距
         st.markdown("<hr style='margin:12px 0; opacity:0.3;'>", unsafe_allow_html=True)
         
-        
-                
-                
-                            
 # 在终端中，进入 app.py 所在目录，执行：
 #                                   streamlit run app.py
