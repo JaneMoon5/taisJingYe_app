@@ -1,17 +1,55 @@
+
 # URL支持组合搜索
-
-# 检索不打开新标签页，浏览器返回键可用
-# 分页浏览
-# 图片缩略图 1/3
-# 点击放大
-# 翻页自动回顶部
-
+# 界面换为卡片视图
+# 有置顶
+# 可倒序、正序
 
 import streamlit as st
 import pandas as pd
+import os
 import re
 from urllib.parse import quote
 from html import escape
+import base64
+from urllib.parse import urlparse, quote
+
+def get_image_src(path_or_url):
+    """
+    返回可用于 <img> 的 src 值。
+    1. 如果是本地文件且存在，返回 Base64 Data URL。
+    2. 如果是网络 URL，处理后返回可访问的 URL（转换 GitHub blob、编码特殊字符）。
+    3. 如果都不成功，返回 None。
+    """
+    s = str(path_or_url).strip()
+    
+    # 处理网络 URL
+    if s.startswith(('http://', 'https://')):
+        # 转换 GitHub blob 链接
+        if 'github.com' in s and '/blob/' in s:
+            s = s.replace('github.com', 'raw.githubusercontent.com')
+            s = s.replace('/blob/', '/')
+        # 统一替换反斜杠
+        s = s.replace('\\', '/')
+        # 对路径部分进行编码（保留协议和域名）
+        parsed = urlparse(s)
+        encoded_path = quote(parsed.path, safe='/')
+        s = parsed._replace(path=encoded_path).geturl()
+        return s
+    
+    # 处理本地路径
+    else:
+        if os.path.exists(s):
+            try:
+                with open(s, 'rb') as f:
+                    img_data = f.read()
+                ext = os.path.splitext(s)[1].lower()
+                mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
+                b64 = base64.b64encode(img_data).decode()
+                return f'data:{mime};base64,{b64}'
+            except Exception:
+                return None
+        else:
+            return None
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
 st.title("📚 精华消息检索系统")
@@ -39,6 +77,60 @@ mark{
     border-radius:4px;
 }
 
+
+/* 消息卡片样式 */
+.message-card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: relative;
+    transition: box-shadow 0.2s;
+}
+.sticky-card {
+    background: #fff9e6;           /* 浅色背景表示置顶 */
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+.sticky-tag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: #ff4b4b;
+    color: white;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 8px 0 8px 0;
+    z-index: 10;
+}
+.card-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+}
+.card-header-item {
+    font-size: 14px;
+}
+.card-header-item a {
+    color: black;
+    text-decoration: none;
+}
+.card-header-item a:hover {
+    text-decoration: underline;
+}
+.card-content {
+    margin-top: 8px;
+}
+.card-content img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,11 +140,22 @@ mark{
 
 @st.cache_data
 def load_data():
+    
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(BASE_DIR, "taisJingYe.csv")
 
-    df = pd.read_csv("taisJingYe.csv", encoding="utf-8-sig")
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    except:
+        st.error("未找到 taisJingYe.csv")
+        st.stop()
+        
 
     df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
     df["设精日期"] = pd.to_datetime(df["设精日期"], errors="coerce")
+    
+    # 记录原始行号，用于前4条置顶 <-- 新增
+    df["原始行号"] = range(len(df))
 
     return df
 
@@ -62,6 +165,8 @@ df = load_data()
 # Session 初始化
 # -----------------------------
 
+top_number = 4
+
 defaults = {
     "search_mode": "普通检索",
     "title":"",
@@ -70,6 +175,7 @@ defaults = {
     "setter":"",
     "start_date": df["日期"].min().date(),
     "end_date": df["日期"].max().date(),
+    "sort_order": "desc",  # 新增排序状态，默认倒序
 }
 
 for k,v in defaults.items():
@@ -156,6 +262,23 @@ def highlight_keywords(text, keywords):
         )
 
     return "".join(parts)
+
+
+# -----------------------------
+# 转义Markdown特殊字符（保留<mark>标签）
+# -----------------------------
+def escape_markdown_except_mark(html_text):
+    """
+    对HTML文本中的Markdown特殊字符进行转义，但保留<mark>标签。
+    """
+    # 临时替换<mark>标签
+    html_text = html_text.replace("<mark>", "|||MARK_START|||").replace("</mark>", "|||MARK_END|||")
+    # 转义所有HTML特殊字符（这也会转义< >等，但我们的占位符是安全的）
+    import html
+    html_text = html.escape(html_text)
+    # 恢复<mark>标签
+    html_text = html_text.replace("|||MARK_START|||", "<mark>").replace("|||MARK_END|||", "</mark>")
+    return html_text
 
 # -----------------------------
 # URL 生成（组合搜索）
@@ -295,29 +418,70 @@ filtered_df = filtered_df[
     (filtered_df["日期"].dt.date <= end_date)
 ]
 
-st.write(f"共找到 **{len(filtered_df)}** 条记录")
+# -----------------------------
+# 右上角排序控件
+# -----------------------------
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.write(f"共找到 **{len(filtered_df)}** 条记录")
+with col2:
+    # 根据当前session_state设置下拉框的默认索引
+    index = 0 if st.session_state.sort_order == "desc" else 1
+    sort_choice = st.selectbox("排序", ["倒序（最新优先）", "正序（最早优先）"], index=index, label_visibility="collapsed")
+    # 更新排序状态
+    st.session_state.sort_order = "desc" if sort_choice.startswith("倒序") else "asc"
 
 # -----------------------------
-# 展示
+# 置顶处理：原csv前4条始终显示在最前 <-- 新增置顶逻辑
+# -----------------------------
+if not filtered_df.empty:
+    # 分离前4条（原始行号 < 4）和其他记录
+    top_mask = filtered_df["原始行号"] < top_number
+    top_df = filtered_df[top_mask].sort_values("原始行号")  # 按原始顺序
+    other_df = filtered_df[~top_mask]
+
+    # 对其他记录按日期排序
+    ascending = True if st.session_state.sort_order == "asc" else False
+    if not other_df.empty:
+        other_df = other_df.sort_values("日期", ascending=ascending)
+
+    # 合并：置顶记录在前，其他在后
+    final_df = pd.concat([top_df, other_df], ignore_index=True)
+else:
+    final_df = filtered_df
+
+# -----------------------------
+# 展示（卡片式布局，修复代码块问题）
 # -----------------------------
 
-if filtered_df.empty:
+if final_df.empty:
 
     st.info("没有找到符合条件的记录")
 
 else:
 
-    for _,row in filtered_df.iterrows():
+    for _, row in final_df.iterrows():
 
         raw_title = str(row["头衔"])
         raw_name = str(row["名字"])
         raw_setter = str(row["设精人"])
 
-        title = highlight_keywords(escape(raw_title),keywords)
-        name = highlight_keywords(escape(raw_name),keywords)
-        setter = highlight_keywords(escape(raw_setter),keywords)
+        # 高亮后的显示文本（已转义HTML特殊字符）
+        title = highlight_keywords(escape(raw_title), keywords)
+        name = highlight_keywords(escape(raw_name), keywords)
+        setter = highlight_keywords(escape(raw_setter), keywords)
 
-        content = highlight_keywords(row["内容"],keywords)
+        # 对内容进行特殊处理：如果是文本，需要转义Markdown特殊字符以防止被解析为代码块
+        if row["格式"] == "图片":
+            img_src = get_image_src(row["内容"])
+            if img_src:
+                content_html = f'<div style="text-align:left;"><img src="{img_src}" style="width:33%; border-radius:6px;" loading="lazy"></div>'
+            else:
+                content_html = '<div>⚠️ 图片无法加载</div>'
+        else:
+            # 文本：先高亮，再转义Markdown特殊字符（保留<mark>标签）
+            content_highlighted = highlight_keywords(row["内容"], keywords)
+            content_html = escape_markdown_except_mark(content_highlighted)
 
         date_str = (
             row["日期"].strftime("%Y-%m-%d")
@@ -325,51 +489,33 @@ else:
             else ""
         )
 
-        cols = st.columns(5)
+        is_sticky = row["原始行号"] < 4
+        card_class = "message-card sticky-card" if is_sticky else "message-card"
+        sticky_tag = '<div class="sticky-tag">置顶</div>' if is_sticky else ""
 
-        with cols[0]:
-            st.markdown(
-                f'<a href="{make_search_link("title",raw_title)}" class="search-link">'
-                f'头衔：<strong>{title}</strong></a>',
-                unsafe_allow_html=True
-            )
+        # 构建头部HTML（避免多余空白）
+        header_items = []
+        header_items.append(f'<div class="card-header-item"><a href="{make_search_link("title", raw_title)}" class="search-link">头衔：<strong>{title}</strong></a></div>')
+        header_items.append(f'<div class="card-header-item"><a href="{make_search_link("name", raw_name)}" class="search-link">名字：<strong>{name}</strong></a></div>')
+        header_items.append(f'<div class="card-header-item"><a href="{make_search_link("date", date_str)}" class="search-link">日期：<strong>{date_str}</strong></a></div>')
+        header_items.append(f'<div class="card-header-item"><a href="{make_search_link("setter", raw_setter)}" class="search-link">设精人：<strong>{setter}</strong></a></div>')
+        if pd.notna(row["设精日期"]):
+            set_date_str = row["设精日期"].strftime("%Y-%m-%d")
+            header_items.append(f'<div class="card-header-item">设精日期：<strong>{set_date_str}</strong></div>')
+        header_html = "".join(header_items)
 
-        with cols[1]:
-            st.markdown(
-                f'<a href="{make_search_link("name",raw_name)}" class="search-link">'
-                f'名字：<strong>{name}</strong></a>',
-                unsafe_allow_html=True
-            )
+        # 使用列表拼接避免缩进问题
+        card_parts = [
+            f'<div class="{card_class}">',
+            sticky_tag,
+            '<div class="card-header">',
+            header_html,
+            '</div>',
+            '<div class="card-content">',
+            content_html,
+            '</div>',
+            '</div>'
+        ]
+        card_html = "\n".join(card_parts)
 
-        with cols[2]:
-            st.markdown(
-                f'<a href="{make_search_link("date",date_str)}" class="search-link">'
-                f'日期：<strong>{date_str}</strong></a>',
-                unsafe_allow_html=True
-            )
-
-        with cols[3]:
-            st.markdown(
-                f'<a href="{make_search_link("setter",raw_setter)}" class="search-link">'
-                f'设精人：<strong>{setter}</strong></a>',
-                unsafe_allow_html=True
-            )
-
-        with cols[4]:
-
-            if pd.notna(row["设精日期"]):
-
-                st.markdown(
-                    f"设精日期： **{row['设精日期'].strftime('%Y-%m-%d')}**"
-                )
-
-        if row["格式"]=="图片":
-
-            st.image(row["内容"],use_container_width=True)
-
-        else:
-
-            st.markdown(content,unsafe_allow_html=True)
-
-        st.markdown("<hr style='opacity:0.3'>",unsafe_allow_html=True)
-        
+        st.markdown(card_html, unsafe_allow_html=True)
