@@ -61,7 +61,7 @@ st.markdown("""
 <style>
 
 .search-link{
-    color:black !important;
+    color:inherit !important;
     text-decoration:none;
 }
 
@@ -77,7 +77,7 @@ mark{
 }
 
 
-/* 消息卡片样式 */
+/* 亮色主题默认消息卡片样式 */
 .message-card {
     background: white;
     border-radius: 8px;
@@ -86,6 +86,7 @@ mark{
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     position: relative;
     transition: box-shadow 0.2s;
+    color: #000;  /* 亮色文字黑色 */
 }
 .sticky-card {
     background: #fff9e6;           /* 浅色背景表示置顶 */
@@ -115,7 +116,7 @@ mark{
     font-size: 14px;
 }
 .card-header-item a {
-    color: black;
+    color: inherit;
     text-decoration: none;
 }
 .card-header-item a:hover {
@@ -129,6 +130,37 @@ mark{
     border-radius: 4px;
 }
 
+/* ========== 深色主题覆盖（同时支持 data-theme 和 class）========== */
+body[data-theme="dark"] .message-card,
+body[data-theme="dark"] .sticky-card,
+body.dark .message-card,
+body.dark .sticky-card {
+    background: #1e1e1e !important;   /* 深色背景 */
+    color: #f0f0f0 !important;        /* 浅色文字 */
+}
+body[data-theme="dark"] .message-card *,
+body[data-theme="dark"] .sticky-card *,
+body.dark .message-card *,
+body.dark .sticky-card * {
+    color: #f0f0f0 !important;        /* 强制所有子元素文字浅色 */
+}
+body[data-theme="dark"] .sticky-card,
+body.dark .sticky-card {
+    background: #2a2a1e !important;   /* 置顶卡片稍亮 */
+}
+body[data-theme="dark"] .card-header,
+body.dark .card-header {
+    border-bottom-color: #444 !important;
+}
+body[data-theme="dark"] mark,
+body.dark mark {
+    background: #b8860b !important;   /* 高亮背景深黄 */
+    color: #fff !important;           /* 高亮文字白色 */
+}
+body[data-theme="dark"] .sticky-tag,
+body.dark .sticky-tag {
+    background: #cc3b3b !important;
+}
 
 </style>
 """, unsafe_allow_html=True)
