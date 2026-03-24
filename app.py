@@ -47,13 +47,16 @@ def get_image_src(path_or_url):
     
     # 本地文件都不存在，尝试作为网络 URL
     if s.startswith(('http://', 'https://')):
-        # 转换 GitHub blob 链接
+        # 处理 GitHub blob 链接
         if 'github.com' in s and '/blob/' in s:
             s = s.replace('github.com', 'raw.githubusercontent.com')
             s = s.replace('/blob/', '/')
+            if '?raw=true' in s:
+                s = s.split('?raw=true')[0]
         s = s.replace('\\', '/')
         parsed = urlparse(s)
-        encoded_path = quote(parsed.path, safe='/')
+        # 保留已有 % 编码，仅对未编码特殊字符进行编码
+        encoded_path = quote(parsed.path, safe='/:%')
         s = parsed._replace(path=encoded_path).geturl()
         return s
     
