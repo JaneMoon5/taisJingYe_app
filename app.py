@@ -11,44 +11,22 @@ import base64
 from urllib.parse import urlparse, quote
 import html as html_module
 
-# 本地文件根目录（请根据实际情况修改）
-LOCAL_ROOT = r"D:\OneDrive\心台\台群精页"
-
-# 远程仓库的 raw 基础 URL（仓库根目录对应的 raw 地址）
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_ROOT = BASE_DIR   # 如果您的图片/视频在仓库根目录下的子文件夹中
 REMOTE_RAW_BASE = "https://raw.githubusercontent.com/JaneMoon5/taisJingYe_app/main/"
 
 def local_to_url(path_or_url):
     s = str(path_or_url).strip()
-    
-    # 1. 如果是 GitHub blob 链接，转换为 raw 链接
-    if 'github.com' in s and '/blob/' in s:
-        s = s.replace('github.com', 'raw.githubusercontent.com')
-        s = s.replace('/blob/', '/')
-        if '?raw=true' in s:
-            s = s.split('?raw=true')[0]
-        # 确保路径编码正确（避免二次编码）
-        parsed = urlparse(s)
-        encoded_path = quote(parsed.path, safe='/:%')
-        s = parsed._replace(path=encoded_path).geturl()
-        return s
-    
-    # 2. 如果已经是普通网络 URL，直接返回
+    # 如果已经是网络URL，直接返回
     if s.startswith(('http://', 'https://')):
+        if 'github.com' in s and '/blob/' in s:
+            s = s.replace('github.com', 'raw.githubusercontent.com')
+            s = s.replace('/blob/', '/')
+            s = s.split('?raw=true')[0]
         return s
-    
-    # 3. 本地路径转远程 URL
-    normalized = os.path.normpath(s)          # 规范化路径（处理反斜杠）
-    try:
-        # 获取相对于 LOCAL_ROOT 的路径
-        rel_path = os.path.relpath(normalized, LOCAL_ROOT)
-    except ValueError:
-        # 如果路径不在 LOCAL_ROOT 下，无法转换，返回原路径（或可改为返回 None）
-        return s
-    
-    # 转换为 URL 友好的格式
-    rel_path = rel_path.replace('\\', '/')    # 统一斜杠
-    encoded_path = quote(rel_path, safe='/')  # URL 编码，保留斜杠
-    return REMOTE_RAW_BASE + encoded_path
+    # 否则视为相对路径，拼接 REMOTE_RAW_BASE
+    # 注意：此时 s 应为相对路径，如 "精华消息-图片/xxx.jpeg"
+    return REMOTE_RAW_BASE + quote(s.replace('\\', '/'), safe='/')
 
 
 def get_image_src(path_or_url):
