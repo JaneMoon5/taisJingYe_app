@@ -19,35 +19,45 @@ def get_image_src(path_or_url):
     3. 如果都不成功，返回 None。
     """
     s = str(path_or_url).strip()
+    # 先尝试作为本地文件
+    # 直接路径
+    if os.path.exists(s):
+        try:
+            with open(s, 'rb') as f:
+                img_data = f.read()
+            ext = os.path.splitext(s)[1].lower()
+            mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
+            b64 = base64.b64encode(img_data).decode()
+            return f'data:{mime};base64,{b64}'
+        except Exception:
+            pass
+    # 尝试相对于脚本目录的路径
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    abs_path = os.path.join(base_dir, s)
+    if os.path.exists(abs_path):
+        try:
+            with open(abs_path, 'rb') as f:
+                img_data = f.read()
+            ext = os.path.splitext(abs_path)[1].lower()
+            mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
+            b64 = base64.b64encode(img_data).decode()
+            return f'data:{mime};base64,{b64}'
+        except Exception:
+            pass
     
-    # 处理网络 URL
+    # 本地文件都不存在，尝试作为网络 URL
     if s.startswith(('http://', 'https://')):
         # 转换 GitHub blob 链接
         if 'github.com' in s and '/blob/' in s:
             s = s.replace('github.com', 'raw.githubusercontent.com')
             s = s.replace('/blob/', '/')
-        # 统一替换反斜杠
         s = s.replace('\\', '/')
-        # 对路径部分进行编码（保留协议和域名）
         parsed = urlparse(s)
         encoded_path = quote(parsed.path, safe='/')
         s = parsed._replace(path=encoded_path).geturl()
         return s
     
-    # 处理本地路径
-    else:
-        if os.path.exists(s):
-            try:
-                with open(s, 'rb') as f:
-                    img_data = f.read()
-                ext = os.path.splitext(s)[1].lower()
-                mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
-                b64 = base64.b64encode(img_data).decode()
-                return f'data:{mime};base64,{b64}'
-            except Exception:
-                return None
-        else:
-            return None
+    return None
 
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
