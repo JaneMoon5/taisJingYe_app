@@ -11,56 +11,48 @@ import base64
 from urllib.parse import urlparse, quote
 import html as html_module
 
-def get_image_src(path_or_url):
-    """
-    返回可用于 <img> 的 src 值。
-    1. 如果是本地文件且存在，返回 Base64 Data URL。
-    2. 如果是网络 URL，处理后返回可访问的 URL（转换 GitHub blob、编码特殊字符）。
-    3. 如果都不成功，返回 None。
-    """
+# 本地文件根目录（请根据实际情况修改）
+LOCAL_ROOT = r"D:\OneDrive\心台\台群精页"
+
+# 远程仓库的 raw 基础 URL（仓库根目录对应的 raw 地址）
+REMOTE_RAW_BASE = "https://raw.githubusercontent.com/JaneMoon5/taisJingYe_app/main/"
+
+def local_to_url(path_or_url):
     s = str(path_or_url).strip()
-    # 先尝试作为本地文件
-    # 直接路径
-    if os.path.exists(s):
-        try:
-            with open(s, 'rb') as f:
-                img_data = f.read()
-            ext = os.path.splitext(s)[1].lower()
-            mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
-            b64 = base64.b64encode(img_data).decode()
-            return f'data:{mime};base64,{b64}'
-        except Exception:
-            pass
-    # 尝试相对于脚本目录的路径
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    abs_path = os.path.join(base_dir, s)
-    if os.path.exists(abs_path):
-        try:
-            with open(abs_path, 'rb') as f:
-                img_data = f.read()
-            ext = os.path.splitext(abs_path)[1].lower()
-            mime = 'image/jpeg' if ext in ('.jpg', '.jpeg') else 'image/png'
-            b64 = base64.b64encode(img_data).decode()
-            return f'data:{mime};base64,{b64}'
-        except Exception:
-            pass
     
-    # 本地文件都不存在，尝试作为网络 URL
-    if s.startswith(('http://', 'https://')):
-        # 处理 GitHub blob 链接
-        if 'github.com' in s and '/blob/' in s:
-            s = s.replace('github.com', 'raw.githubusercontent.com')
-            s = s.replace('/blob/', '/')
-            if '?raw=true' in s:
-                s = s.split('?raw=true')[0]
-        s = s.replace('\\', '/')
+    # 1. 如果是 GitHub blob 链接，转换为 raw 链接
+    if 'github.com' in s and '/blob/' in s:
+        s = s.replace('github.com', 'raw.githubusercontent.com')
+        s = s.replace('/blob/', '/')
+        if '?raw=true' in s:
+            s = s.split('?raw=true')[0]
+        # 确保路径编码正确（避免二次编码）
         parsed = urlparse(s)
-        # 保留已有 % 编码，仅对未编码特殊字符进行编码
         encoded_path = quote(parsed.path, safe='/:%')
         s = parsed._replace(path=encoded_path).geturl()
         return s
     
-    return None
+    # 2. 如果已经是普通网络 URL，直接返回
+    if s.startswith(('http://', 'https://')):
+        return s
+    
+    # 3. 本地路径转远程 URL
+    normalized = os.path.normpath(s)          # 规范化路径（处理反斜杠）
+    try:
+        # 获取相对于 LOCAL_ROOT 的路径
+        rel_path = os.path.relpath(normalized, LOCAL_ROOT)
+    except ValueError:
+        # 如果路径不在 LOCAL_ROOT 下，无法转换，返回原路径（或可改为返回 None）
+        return s
+    
+    # 转换为 URL 友好的格式
+    rel_path = rel_path.replace('\\', '/')    # 统一斜杠
+    encoded_path = quote(rel_path, safe='/')  # URL 编码，保留斜杠
+    return REMOTE_RAW_BASE + encoded_path
+
+
+def get_image_src(path_or_url):
+    return local_to_url(path_or_url)
 
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
