@@ -1,8 +1,5 @@
 
-# URL支持组合搜索
-# 界面换为卡片视图
-# 有置顶
-# 可倒序、正序
+# 增加视频显示
 
 import streamlit as st
 import pandas as pd
@@ -12,6 +9,7 @@ from urllib.parse import quote
 from html import escape
 import base64
 from urllib.parse import urlparse, quote
+import html as html_module
 
 def get_image_src(path_or_url):
     """
@@ -50,6 +48,7 @@ def get_image_src(path_or_url):
                 return None
         else:
             return None
+
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
 st.title("📚 精华消息检索系统")
@@ -165,7 +164,7 @@ df = load_data()
 # Session 初始化
 # -----------------------------
 
-top_number = 4
+top_number = 5
 
 defaults = {
     "search_mode": "普通检索",
@@ -460,7 +459,7 @@ if final_df.empty:
 
 else:
 
-    for _, row in final_df.iterrows():
+    for idx, row in final_df.iterrows():
 
         raw_title = str(row["头衔"])
         raw_name = str(row["名字"])
@@ -478,6 +477,11 @@ else:
                 content_html = f'<div style="text-align:left;"><img src="{img_src}" style="width:33%; border-radius:6px;" loading="lazy"></div>'
             else:
                 content_html = '<div>⚠️ 图片无法加载</div>'
+        
+        elif row["格式"] == "视频":
+            content_highlighted = highlight_keywords(row["内容"], keywords)
+            content_html = escape_markdown_except_mark(content_highlighted)
+        
         else:
             # 文本：先高亮，再转义Markdown特殊字符（保留<mark>标签）
             content_highlighted = highlight_keywords(row["内容"], keywords)
@@ -489,7 +493,7 @@ else:
             else ""
         )
 
-        is_sticky = row["原始行号"] < 4
+        is_sticky = row["原始行号"] < top_number
         card_class = "message-card sticky-card" if is_sticky else "message-card"
         sticky_tag = '<div class="sticky-tag">置顶</div>' if is_sticky else ""
 
