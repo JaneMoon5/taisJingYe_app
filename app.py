@@ -1,5 +1,5 @@
 
-# 增加视频显示
+# 插入头衔-名字对应图谱链接
 
 import streamlit as st
 import pandas as pd
@@ -35,6 +35,16 @@ def get_image_src(path_or_url):
 
 st.set_page_config(page_title="精华消息检索", layout="wide")
 st.title("📚 精华消息检索系统")
+
+# 插入头衔名字对应图谱链接
+st.markdown(
+    '<div style="margin-top: -10px; margin-bottom: 20px;">'
+    '<a href="https://taistitle-name.streamlit.app/" target="_blank" class="graph-link">'
+    '点击此处查看头衔-名字对应图谱'
+    '</a>'
+    '</div>',
+    unsafe_allow_html=True
+)
 
 # -----------------------------
 # CSS
@@ -143,6 +153,16 @@ body.dark mark {
 body[data-theme="dark"] .sticky-tag,
 body.dark .sticky-tag {
     background: #cc3b3b !important;
+}
+
+/* 图谱链接样式 */
+.graph-link {
+    color: black;
+    font-weight: bold;
+    text-decoration: none;
+}
+.graph-link:hover {
+    text-decoration: underline;
 }
 
 </style>
