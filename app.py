@@ -1,5 +1,6 @@
 
 # 插入头衔-名字对应图谱链接
+# 优化换行显示
 
 import streamlit as st
 import pandas as pd
@@ -117,6 +118,7 @@ mark{
 }
 .card-content {
     margin-top: 8px;
+    white-space: pre-wrap;   /* 新增这一行保留自动换行 */
 }
 .card-content img {
     max-width: 100%;
@@ -180,8 +182,8 @@ def load_data():
 
     try:
         df = pd.read_csv(csv_path, encoding="utf-8-sig")
-    except:
-        st.error("未找到 taisJingYe.csv")
+    except Exception as e:
+        st.error(f"读取 CSV 文件失败：{e}")
         st.stop()
         
 
