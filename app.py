@@ -1,5 +1,8 @@
 
-# 翻页不打开新标签页
+# 图片代理CDN
+# 图片点击放大
+# 尾部翻页自动回顶部
+# 一键回顶部
 
 import streamlit as st
 import pandas as pd
@@ -259,6 +262,19 @@ def load_data():
         df = pd.read_csv(csv_path, encoding="utf-8-sig")
     except Exception as e:
         st.error(f"读取 CSV 文件失败：{e}")
+        # 提取行号
+        msg = str(e)
+        match = re.search(r"line\s+(\d+)", msg, re.IGNORECASE)
+        if match:
+            line_num = int(match.group(1))
+            import csv
+            with open(csv_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                st.write(f"总行数（csv.reader 解析后）: {len(rows)}")
+                if len(rows) >= line_num:
+                    st.write(f"该行字段数: {len(rows[line_num-1])}")
+                    st.write(rows[line_num-1])
         st.stop()
         
 
@@ -841,7 +857,7 @@ else:
 
 
 # 在所有卡片渲染完成后，注入绑定脚本
-st.components.v1.html("""
+st.html("""
 <script>
 (function() {
     function bindAllButtons() {
@@ -862,14 +878,12 @@ st.components.v1.html("""
         }
     }
 
-    // 首次绑定延迟 200ms，确保卡片已渲染
     setTimeout(bindAllButtons, 200);
 
-    // 监听 Streamlit 重新渲染（通过观察 body 变化）
     var observer = new MutationObserver(function() {
         bindAllButtons();
     });
     observer.observe(window.parent.document.body, { childList: true, subtree: true });
 })();
 </script>
-""", height=0, scrolling=False)
+""")
